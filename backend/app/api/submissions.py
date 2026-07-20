@@ -28,6 +28,7 @@ from app.schemas.catalog import (
     SubmissionOut,
 )
 from app.services.storage import get_storage
+from app.services.tokens import tokens_used_for_seller
 
 logger = logging.getLogger("vastra.api")
 router = APIRouter(prefix="/submissions", tags=["submissions"])
@@ -63,6 +64,14 @@ def create_submission(
 ) -> SubmissionOut:
     if not images:
         raise HTTPException(status_code=400, detail="At least one image is required")
+
+    # Token gate — block if the seller's balance is exhausted.
+    used = tokens_used_for_seller(db, user.id)
+    if used >= user.token_limit:
+        raise HTTPException(
+            status_code=402,
+            detail="Token balance exhausted. Top up to keep generating products.",
+        )
 
     try:
         cust = json.loads(customization) if customization else {}

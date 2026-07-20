@@ -63,6 +63,7 @@ class Seller(Base):
     phone: Mapped[str | None] = mapped_column(String(20))
     password_hash: Mapped[str] = mapped_column(String(255))
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    token_limit: Mapped[int] = mapped_column(Integer, default=200_000)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     submissions: Mapped[list["Submission"]] = relationship(back_populates="seller")

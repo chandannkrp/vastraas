@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
 
+    # Tokens — standard grant per seller; top-up increases the limit
+    default_token_limit: int = 200_000
+
     # Seed admin (created on startup if no admin exists)
     admin_email: str = "admin@vastra.ai"
     admin_password: str = "admin12345"

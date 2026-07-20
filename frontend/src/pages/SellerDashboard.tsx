@@ -1,17 +1,21 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { LayoutGrid, Plug, Plus, Images } from "lucide-react";
+import { BookOpen, Coins, Images, LayoutGrid, Plug, Plus } from "lucide-react";
 import { useState } from "react";
 import { Navbar } from "../components/Navbar";
 import { useAuth } from "../lib/auth";
 import { Connectors } from "./sections/Connectors";
+import { Lookbooks } from "./sections/Lookbooks";
 import { NewProduct } from "./sections/NewProduct";
 import { Overview } from "./sections/Overview";
 import { Products } from "./sections/Products";
+import { Tokens } from "./sections/Tokens";
 
 const TABS = [
   { key: "overview", label: "Overview", icon: LayoutGrid },
   { key: "new", label: "Add product", icon: Plus },
   { key: "products", label: "Gallery", icon: Images },
+  { key: "lookbooks", label: "Lookbooks", icon: BookOpen },
+  { key: "tokens", label: "Tokens", icon: Coins },
   { key: "connectors", label: "Connectors", icon: Plug },
 ];
 
@@ -72,6 +76,8 @@ export default function SellerDashboard() {
                 {tab === "overview" && <Overview onOpen={setTab} />}
                 {tab === "new" && <NewProduct />}
                 {tab === "products" && <Products onOpen={setTab} />}
+                {tab === "lookbooks" && <Lookbooks />}
+                {tab === "tokens" && <Tokens />}
                 {tab === "connectors" && <Connectors />}
               </motion.div>
             </AnimatePresence>

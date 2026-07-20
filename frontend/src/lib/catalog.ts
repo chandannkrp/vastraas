@@ -137,3 +137,81 @@ export async function getShopifyStatus(): Promise<ConnectorStatus> {
   const { data } = await api.get("/connectors/shopify");
   return data;
 }
+
+// --- Tokens ------------------------------------------------------------
+
+export interface DailyPoint {
+  date: string;
+  tokens: number;
+}
+
+export interface TokenSummary {
+  limit: number;
+  used: number;
+  remaining: number;
+  percent_used: number;
+  daily: DailyPoint[];
+}
+
+export async function getTokenSummary(): Promise<TokenSummary> {
+  const { data } = await api.get("/tokens/summary");
+  return data;
+}
+
+export async function topUpTokens(amount: number): Promise<TokenSummary> {
+  const { data } = await api.post("/tokens/topup", { amount });
+  return data;
+}
+
+// --- Admin -------------------------------------------------------------
+
+export interface BusinessRow {
+  id: string;
+  name: string;
+  email: string;
+  is_admin: boolean;
+  created_at: string;
+  submissions: number;
+  published: number;
+  tokens_used: number;
+  token_limit: number;
+}
+
+export interface GrowthMetrics {
+  total_sellers: number;
+  new_sellers_7d: number;
+  total_submissions: number;
+  total_published: number;
+  total_tokens: number;
+  signups_daily: { date: string; count: number }[];
+  submissions_daily: { date: string; count: number }[];
+}
+
+export interface SellerLogEntry {
+  submission_id: string;
+  title: string | null;
+  status: string;
+  stage: string | null;
+  tokens: number;
+  created_at: string;
+}
+
+export interface BusinessDetail {
+  business: BusinessRow;
+  logs: SellerLogEntry[];
+}
+
+export async function getBusinesses(): Promise<BusinessRow[]> {
+  const { data } = await api.get("/admin/sellers");
+  return data;
+}
+
+export async function getBusinessDetail(id: string): Promise<BusinessDetail> {
+  const { data } = await api.get(`/admin/sellers/${id}`);
+  return data;
+}
+
+export async function getGrowth(): Promise<GrowthMetrics> {
+  const { data } = await api.get("/admin/growth");
+  return data;
+}

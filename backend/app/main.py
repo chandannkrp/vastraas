@@ -3,7 +3,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import analytics, auth, connectors, images, products, submissions
+from app.api import (
+    admin,
+    analytics,
+    auth,
+    connectors,
+    images,
+    products,
+    submissions,
+    tokens,
+)
 from app.config import get_settings
 from app.db import init_db
 from app.seed import ensure_admin
@@ -28,7 +37,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (auth, submissions, images, products, analytics, connectors):
+for r in (auth, submissions, images, products, analytics, connectors, tokens, admin):
     app.include_router(r.router, prefix="/api")
 
 

@@ -1,4 +1,5 @@
 import { Route, Routes } from "react-router-dom";
+import { PipelineDock } from "./components/PipelineDock";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import AdminDashboard from "./pages/AdminDashboard";
 import Landing from "./pages/Landing";
@@ -8,7 +9,8 @@ import SellerDashboard from "./pages/SellerDashboard";
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -29,6 +31,8 @@ export default function App() {
         }
       />
       <Route path="*" element={<Landing />} />
-    </Routes>
+      </Routes>
+      <PipelineDock />
+    </>
   );
 }

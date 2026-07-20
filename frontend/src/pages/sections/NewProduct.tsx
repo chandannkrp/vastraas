@@ -2,8 +2,8 @@ import { AxiosError } from "axios";
 import { motion } from "framer-motion";
 import { ImagePlus, Loader2, Sparkles, X } from "lucide-react";
 import { useRef, useState } from "react";
-import { SubmissionProgress } from "../../components/SubmissionProgress";
 import { createSubmission, type Customization } from "../../lib/catalog";
+import { usePipelineDock } from "../../lib/pipelineDock";
 
 const SHOTS = [
   { key: "flatlay", label: "Flat-lay" },
@@ -26,8 +26,8 @@ export function NewProduct() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { track, notify } = usePipelineDock();
 
   function addFiles(list: FileList | null) {
     if (!list) return;
@@ -51,38 +51,19 @@ export function NewProduct() {
     setError(null);
     setSubmitting(true);
     try {
+      const title = fields.title || fields.fabric_type || "New product";
       const { id } = await createSubmission(files, fields, cust);
-      setActiveId(id);
+      track(id, title);
+      notify("Sent to the studio — track progress in the corner.", "success");
+      // Reset so they can immediately add another; the dock shows progress.
+      setFiles([]);
+      setFields({ title: "", fabric_type: "", color: "", notes: "" });
     } catch (err) {
       const ax = err as AxiosError<{ detail?: string }>;
       setError(ax.response?.data?.detail ?? "Upload failed. Try again.");
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (activeId) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="font-display text-2xl font-semibold text-ink">Processing your product</h2>
-            <p className="text-ink-soft">Watch the agents work in real time.</p>
-          </div>
-          <button
-            onClick={() => {
-              setActiveId(null);
-              setFiles([]);
-              setFields({ title: "", fabric_type: "", color: "", notes: "" });
-            }}
-            className="rounded-full border border-black/10 px-5 py-2.5 text-sm font-semibold text-ink transition hover:border-indigo-300"
-          >
-            + Add another
-          </button>
-        </div>
-        <SubmissionProgress id={activeId} />
-      </div>
-    );
   }
 
   return (
