@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BrandLoader, BrandLoaderPanel } from "../../components/BrandLoader";
 import { ProductModal } from "../../components/ProductModal";
 import { StatusBadge } from "../../components/StatusBadge";
+import { SkeletonImage } from "../../components/SkeletonImage";
 import { assetUrl } from "../../lib/api";
 import { listProducts, publishSetToShopify, type ProductCard } from "../../lib/catalog";
 import { usePipelineDock } from "../../lib/pipelineDock";
@@ -229,10 +230,11 @@ export function Catalog({ onOpen }: { onOpen: (tab: string) => void }) {
 
                 <div className="relative aspect-[4/5] overflow-hidden bg-cream-deep">
                   {p.thumbnail_url ? (
-                    <img
+                    <SkeletonImage
                       src={assetUrl(p.thumbnail_url)}
                       alt={p.title}
-                      className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                      className="absolute inset-0 h-full w-full"
+                      imgClassName="transition duration-700 group-hover:scale-105"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-ink-soft/40">
@@ -385,13 +387,11 @@ function SetPublishModal({
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {products.map((p) => (
                     <div key={p.submission_id} className="w-24 shrink-0">
-                      <div className="aspect-[4/5] overflow-hidden rounded-xl bg-cream-deep">
-                        {p.thumbnail_url ? (
-                          <img src={assetUrl(p.thumbnail_url)} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-ink-soft/40"><Images size={20} /></div>
-                        )}
-                      </div>
+                      {p.thumbnail_url ? (
+                        <SkeletonImage src={assetUrl(p.thumbnail_url)} className="aspect-[4/5] rounded-xl" />
+                      ) : (
+                        <div className="flex aspect-[4/5] items-center justify-center rounded-xl bg-cream-deep text-ink-soft/40"><Images size={20} /></div>
+                      )}
                       <p className="mt-1 truncate text-[11px] text-ink-soft">{p.title}</p>
                     </div>
                   ))}

@@ -1,10 +1,10 @@
 import { AxiosError } from "axios";
 import { AnimatePresence, motion } from "framer-motion";
-import { ImagePlus, PenLine, Plus, Sparkles, User, Wand2, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { Coins, Gauge, ImagePlus, PenLine, Plus, Sparkles, User, Wand2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { BrandLoader } from "../../components/BrandLoader";
 import { SubmissionProgress } from "../../components/SubmissionProgress";
-import { createSubmission, type Customization } from "../../lib/catalog";
+import { createSubmission, getImageModels, type Customization, type ImageModel } from "../../lib/catalog";
 import { usePipelineDock } from "../../lib/pipelineDock";
 
 // "On-model" leads — a professional, studio-shot model wearing the seller's
@@ -48,7 +48,7 @@ export function NewProduct() {
   const [files, setFiles] = useState<File[]>([]);
   const [fields, setFields] = useState({ title: "", fabric_type: "", color: "", notes: "" });
   const [cust, setCust] = useState<Customization>({
-    image_shots: ["flatlay", "draped", "macro"],
+    image_shots: ["on_model", "draped", "flatlay"],
     tone: "editorial",
     audience: "designers",
     length: "standard",
@@ -57,7 +57,13 @@ export function NewProduct() {
     texture: "",
     pattern: "",
     custom_prompt: "",
+    image_quality: "balanced",
   });
+  const [models, setModels] = useState<ImageModel[]>([]);
+
+  useEffect(() => {
+    getImageModels().then(setModels).catch(() => setModels([]));
+  }, []);
   const [customShots, setCustomShots] = useState<{ key: string; label: string; signature?: boolean }[]>([]);
   const [addingShot, setAddingShot] = useState(false);
   const [newShotText, setNewShotText] = useState("");
@@ -72,6 +78,12 @@ export function NewProduct() {
   const [formOpen, setFormOpen] = useState(true);
 
   const shots = [...BASE_SHOTS, ...customShots];
+
+  // Token estimate for the model chooser. The backend caps a shoot at 4 images,
+  // so the estimate uses the same cap.
+  const selectedModel = models.find((m) => m.key === cust.image_quality) ?? models[0];
+  const nShots = Math.min(cust.image_shots.length, 4);
+  const estTokens = selectedModel ? selectedModel.tokens_per_image * nShots : 0;
 
   function addFiles(list: FileList | null) {
     if (!list) return;
@@ -267,6 +279,44 @@ export function NewProduct() {
               <AddChip open={addingShot} value={newShotText} onOpen={() => setAddingShot(true)} onChange={setNewShotText} onCommit={commitCustomShot} onCancel={() => { setAddingShot(false); setNewShotText(""); }} placeholder="e.g. on a rack" />
             </div>
           </Group>
+
+          {/* Image model chooser — pick quality vs token spend up front. */}
+          {models.length > 0 && (
+            <Group label="Image model">
+              <div className="grid gap-2 sm:grid-cols-3">
+                {models.map((m) => {
+                  const active = cust.image_quality === m.key;
+                  return (
+                    <button
+                      key={m.key}
+                      type="button"
+                      onClick={() => setCust((c) => ({ ...c, image_quality: m.key }))}
+                      className={`rounded-2xl border p-3 text-left transition ${
+                        active ? "border-indigo-600 bg-indigo-50 ring-1 ring-indigo-600" : "border-black/10 bg-white hover:border-indigo-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-ink">{m.label}</span>
+                        {m.recommended && (
+                          <span className="rounded-full bg-saffron-300/50 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-saffron-600">Best</span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-[11px] leading-tight text-ink-soft">{m.blurb}</p>
+                      <p className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-indigo-700">
+                        <Coins size={11} /> {m.tokens_per_image.toLocaleString()} / image
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-2 flex items-center gap-2 rounded-xl bg-cream-deep/50 px-3 py-2 text-xs text-ink-soft">
+                <Gauge size={13} className="text-indigo-700" />
+                Estimated <span className="font-semibold text-ink">{estTokens.toLocaleString()} tokens</span> for {nShots}
+                {nShots === 1 ? " shot" : " shots"}
+                {selectedModel ? ` at ${selectedModel.label} quality` : ""}.
+              </div>
+            </Group>
+          )}
 
           {/* The custom description box — this is what actually drives the
               image generation model, so it gets the most visual weight. */}

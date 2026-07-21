@@ -15,6 +15,15 @@ class Settings(BaseSettings):
     app_name: str = "vastra.ai"
     debug: bool = True
     frontend_origin: str = "http://localhost:5173"
+    # CORS: comma-separated list of allowed origins (falls back to frontend_origin).
+    # Use "*" to allow any origin. Optionally a regex for dynamic subdomains.
+    cors_origins: str = ""
+    cors_origin_regex: str = ""
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        raw = self.cors_origins or self.frontend_origin
+        return [o.strip() for o in raw.split(",") if o.strip()]
 
     # AI service (agent pipeline). If set, the backend delegates pipeline runs
     # to this separate service over HTTP; if blank, it runs in-process.
@@ -53,6 +62,10 @@ class Settings(BaseSettings):
     # Database
     database_url: str = f"sqlite:///{BASE_DIR / 'vastra.db'}"
 
+    # Cache: Redis if REDIS_URL is set (e.g. redis://localhost:6379/0),
+    # else a small in-process TTL cache. Speeds up slow/repeated reads.
+    redis_url: str = ""
+
     # Object storage: "local" for dev, "s3" for AWS S3 (or R2) in prod
     storage_backend: str = "local"
     storage_local_dir: Path = BASE_DIR / "storage"
@@ -77,7 +90,7 @@ class Settings(BaseSettings):
     # AWS Bedrock — auth via a long-term Bedrock API key (bearer token). The
     # region must have the model enabled under Bedrock → Model access.
     aws_bedrock_api_key: str = ""
-    bedrock_model_id: str = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+    bedrock_model_id: str = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
     bedrock_region: str = ""  # falls back to aws_region
 
     # Image generation provider: "gemini" (fast/cheap/photoreal, default) or "openai".

@@ -69,6 +69,17 @@ class Seller(Base):
     submissions: Mapped[list["Submission"]] = relationship(back_populates="seller")
 
 
+class AppSetting(Base):
+    """Runtime key/value config, editable by admins without redeploy — e.g. which
+    LLM / image provider is active. Overrides the env defaults when present."""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
 class ShopifyConnection(Base):
     """A seller's own Shopify store credentials, so each seller publishes to
     their own store. One connection per seller."""

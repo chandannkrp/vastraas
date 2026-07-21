@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from langchain_core.messages import HumanMessage, SystemMessage
 from sqlalchemy import select
 
-from app.agents.llm import get_chat_llm
+from app.agents.llm import structured_llm
 from app.agents.progress import add_usage, finish_stage, start_stage
 from app.agents.schemas import MarketingContent, ProductAttributes, ProductListing
 from app.agents.state import PipelineState
@@ -21,6 +21,7 @@ from app.config import get_settings
 from app.db import SessionLocal
 from app.models.tables import Image, PipelineRun, Product, Submission
 from app.services.image_gen import aspect_for, build_prompt, get_image_service
+from app.services.image_tiers import tier_for
 from app.services.storage import get_storage
 
 logger = logging.getLogger("vastra.agents")
@@ -83,7 +84,7 @@ def intake_node(state: PipelineState) -> PipelineState:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("could not load raw image %s: %s", img.id, exc)
 
-        llm = get_chat_llm(0.2).with_structured_output(ProductAttributes, include_raw=True)
+        llm = structured_llm(ProductAttributes, 0.2)
         result = llm.invoke(
             [
                 SystemMessage(
@@ -131,6 +132,7 @@ def image_node(state: PipelineState) -> PipelineState:
         pattern = cust.get("pattern")  # e.g. floral, block-print, ikat
 
         service = get_image_service()
+        tier = tier_for(cust.get("image_quality"))
         descriptor = " ".join(
             p for p in [
                 dye or attrs.get("color") or ", ".join(attrs.get("colors", [])),
@@ -164,8 +166,8 @@ def image_node(state: PipelineState) -> PipelineState:
             prompt = build_prompt(descriptor, shot, custom_prompt, has_reference=base_bytes is not None)
             aspect = aspect_for(shot)
             if base_bytes is not None:
-                return shot, service.edit(base_bytes, prompt, aspect=aspect)
-            return shot, service.generate(prompt, aspect=aspect)
+                return shot, service.edit(base_bytes, prompt, aspect=aspect, quality=tier["quality"])
+            return shot, service.generate(prompt, aspect=aspect, quality=tier["quality"])
 
         results: list[tuple[str, bytes]] = []
         errors: list[str] = []
@@ -203,13 +205,13 @@ def image_node(state: PipelineState) -> PipelineState:
         if not image_ids:
             raise RuntimeError(errors and f"all image generations failed ({', '.join(errors)})" or "no images generated")
 
-        # Charge image generation to the token budget so usage reflects real spend.
-        add_usage(db, run, 0, len(image_ids) * settings.image_token_cost)
+        # Charge image generation by the chosen tier so usage reflects real spend.
+        add_usage(db, run, 0, len(image_ids) * tier["tokens"])
         db.commit()
 
         elapsed = time.monotonic() - started
         mode = "dry-run" if settings.dry_run_images else ("edited" if base_bytes else "generated")
-        detail = f"{len(image_ids)} images ({mode}) in {elapsed:.0f}s"
+        detail = f"{len(image_ids)} {tier['label'].lower()} images ({mode}) in {elapsed:.0f}s"
         if errors:
             detail += f" · {len(errors)} failed"
         finish_stage(db, run, "enhancing", detail)
@@ -233,7 +235,7 @@ def listing_node(state: PipelineState) -> PipelineState:
         custom_prompt = (cust.get("custom_prompt") or "").strip()
         seller_note = f" Seller's specific request: {custom_prompt}." if custom_prompt else ""
 
-        llm = get_chat_llm(0.5).with_structured_output(ProductListing, include_raw=True)
+        llm = structured_llm(ProductListing, 0.5)
         result = llm.invoke(
             [
                 SystemMessage(
@@ -269,7 +271,7 @@ def marketing_node(state: PipelineState) -> PipelineState:
         attrs = state.get("attributes", {})
         listing = state.get("listing", {})
 
-        llm = get_chat_llm(0.7).with_structured_output(MarketingContent, include_raw=True)
+        llm = structured_llm(MarketingContent, 0.7)
         result = llm.invoke(
             [
                 SystemMessage("You are a fashion marketing copywriter for a fabric brand."),

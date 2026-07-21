@@ -3,10 +3,12 @@ import {
   ArrowRight,
   Camera,
   CheckCircle2,
+  Copy,
   Images,
   Layers,
   Lightbulb,
   RefreshCw,
+  Rocket,
   Shirt,
   Sparkles,
   Sun,
@@ -16,6 +18,7 @@ import {
 import { useEffect, useState } from "react";
 import { BrandLoaderPanel } from "../../components/BrandLoader";
 import { ProductModal } from "../../components/ProductModal";
+import { SkeletonImage } from "../../components/SkeletonImage";
 import { StatusBadge } from "../../components/StatusBadge";
 import { assetUrl } from "../../lib/api";
 import {
@@ -30,6 +33,19 @@ const GENERATION_TIPS = [
   { icon: Camera, title: "Fill the frame", body: "Get close, keep the fabric flat or naturally draped — less background, more weave." },
   { icon: Type, title: "Be specific in the prompt", body: "\"Softbox lighting, seamless grey backdrop\" beats \"nice photo\"." },
   { icon: Shirt, title: "Try on-model for social", body: "On-model shots convert best on Instagram and product pages alike." },
+];
+
+const WHATS_NEW = [
+  { tag: "New", title: "Choose your image model", body: "Pick Standard, Balanced or Premium before a shoot — see the token cost up front." },
+  { tag: "New", title: "Publish fabrics as a set", body: "Select several fabrics in the catalogue and list them as one Shopify product." },
+  { tag: "Improved", title: "Sharper, true-to-fabric studio shots", body: "Full-body studio framing that keeps your real weave and colour intact." },
+];
+
+const PROMPT_INSPO = [
+  "Full-length studio shot — a model wearing this as a flowing saree, soft window light, seamless ivory backdrop",
+  "On-model co-ord set, editorial fashion photography, natural pose, minimalist studio",
+  "Draped over a stand to show the fall and sheen, golden-hour side light",
+  "Flat-lay on warm marble with a marigold sprig, crisp top-down light",
 ];
 
 export function Overview({ onOpen }: { onOpen: (tab: string) => void }) {
@@ -131,6 +147,42 @@ export function Overview({ onOpen }: { onOpen: (tab: string) => void }) {
         </div>
       </div>
 
+      {/* What's new + prompt inspiration */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center gap-2.5">
+            <span className="inline-flex rounded-xl bg-indigo-50 p-2 text-indigo-700"><Rocket size={18} /></span>
+            <h3 className="font-display text-lg font-semibold text-ink">What's new</h3>
+          </div>
+          <ul className="space-y-3">
+            {WHATS_NEW.map((n) => (
+              <li key={n.title} className="flex gap-3">
+                <span className={`mt-0.5 h-fit shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${n.tag === "New" ? "bg-emerald-100 text-emerald-700" : "bg-saffron-300/50 text-saffron-600"}`}>{n.tag}</span>
+                <div>
+                  <p className="text-sm font-semibold text-ink">{n.title}</p>
+                  <p className="text-xs leading-relaxed text-ink-soft">{n.body}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="rounded-3xl border border-indigo-100 bg-gradient-to-br from-indigo-50/70 via-white to-cream-deep/30 p-6 shadow-sm">
+          <div className="mb-4 flex items-center gap-2.5">
+            <span className="inline-flex rounded-xl bg-white p-2 text-indigo-700 shadow-sm"><Wand2 size={18} /></span>
+            <div>
+              <h3 className="font-display text-lg font-semibold text-ink">Prompt inspiration</h3>
+              <p className="text-xs text-ink-soft">Tap to copy — paste into the studio's "Describe your vision".</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {PROMPT_INSPO.map((p) => (
+              <PromptChip key={p} text={p} />
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Recent products — structured cards, not a flat list */}
       <div>
         <div className="mb-4 flex items-center justify-between">
@@ -159,10 +211,10 @@ export function Overview({ onOpen }: { onOpen: (tab: string) => void }) {
               >
                 <div className="relative aspect-[16/10] overflow-hidden bg-cream-deep">
                   {s.thumbnail_url ? (
-                    <img
+                    <SkeletonImage
                       src={assetUrl(s.thumbnail_url)}
-                      alt=""
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      className="absolute inset-0 h-full w-full"
+                      imgClassName="transition duration-500 group-hover:scale-105"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-ink-soft/30">
@@ -197,5 +249,24 @@ export function Overview({ onOpen }: { onOpen: (tab: string) => void }) {
         {openId && <ProductModal submissionId={openId} onClose={() => setOpenId(null)} />}
       </AnimatePresence>
     </div>
+  );
+}
+
+function PromptChip({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard?.writeText(text).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+      className="group flex w-full items-start gap-2 rounded-xl border border-black/5 bg-white px-3 py-2.5 text-left text-xs text-ink-soft transition hover:border-indigo-300"
+    >
+      <Copy size={13} className={`mt-0.5 shrink-0 transition ${copied ? "text-emerald-600" : "text-indigo-500 group-hover:text-indigo-700"}`} />
+      <span className="flex-1">{text}</span>
+      {copied && <span className="shrink-0 font-semibold text-emerald-600">Copied</span>}
+    </button>
   );
 }

@@ -147,13 +147,15 @@ class GeminiImageService:
                     return _normalize_png(inline.data)
         raise RuntimeError("Gemini returned no image (possibly blocked or empty response)")
 
-    def generate(self, prompt: str, aspect: str = "1:1") -> bytes:
+    def generate(self, prompt: str, aspect: str = "1:1", quality: str | None = None) -> bytes:
         full = f"{prompt}\n\n{_RULES}"
         if settings.dry_run_images:
             return _placeholder_png(prompt)
         return self._run([full], aspect)
 
-    def edit(self, image_bytes: bytes, prompt: str, aspect: str = "3:4", filename: str = "input.png") -> bytes:
+    def edit(
+        self, image_bytes: bytes, prompt: str, aspect: str = "3:4", quality: str | None = None, filename: str = "input.png"
+    ) -> bytes:
         from google.genai import types
 
         full = f"{prompt}\n\n{_RULES}"
@@ -179,7 +181,7 @@ class OpenAIImageService:
             self._client = OpenAI(api_key=settings.openai_api_key)
         return self._client
 
-    def generate(self, prompt: str, aspect: str = "1:1") -> bytes:
+    def generate(self, prompt: str, aspect: str = "1:1", quality: str | None = None) -> bytes:
         full = f"{prompt}\n\n{_RULES}"
         if settings.dry_run_images:
             return _placeholder_png(prompt)
@@ -187,12 +189,14 @@ class OpenAIImageService:
             model=settings.openai_image_model,
             prompt=full,
             size=_openai_size(aspect),
-            quality=settings.openai_image_quality,
+            quality=quality or settings.openai_image_quality,
             n=1,
         )
         return base64.b64decode(result.data[0].b64_json)
 
-    def edit(self, image_bytes: bytes, prompt: str, aspect: str = "3:4", filename: str = "input.png") -> bytes:
+    def edit(
+        self, image_bytes: bytes, prompt: str, aspect: str = "3:4", quality: str | None = None, filename: str = "input.png"
+    ) -> bytes:
         full = f"{prompt}\n\n{_RULES}"
         if settings.dry_run_images:
             return _placeholder_png(prompt)
@@ -203,15 +207,17 @@ class OpenAIImageService:
             image=buf,
             prompt=full,
             size=_openai_size(aspect),
-            quality=settings.openai_image_quality,
+            quality=quality or settings.openai_image_quality,
             n=1,
         )
         return base64.b64decode(result.data[0].b64_json)
 
 
 def get_image_service():
-    """The image provider selected by IMAGE_PROVIDER (default: gemini)."""
-    provider = (settings.image_provider or "gemini").lower()
+    """The active image provider (runtime override, else IMAGE_PROVIDER env)."""
+    from app.services import runtime_config
+
+    provider = (runtime_config.get("image_provider") or settings.image_provider or "gemini").lower()
     if provider == "openai":
         return OpenAIImageService()
     return GeminiImageService()

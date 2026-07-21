@@ -23,6 +23,7 @@ import {
 } from "../lib/catalog";
 import { BrandLoader } from "./BrandLoader";
 import { GenerationLoader } from "./GenerationLoader";
+import { SkeletonImage } from "./SkeletonImage";
 
 const SHOTS = [
   { key: "on_model", label: "On-model", icon: User },
@@ -134,7 +135,7 @@ export function ImageFeed({
                 }`}
                 onClick={() => openPreview(img)}
               >
-                <img src={assetUrl(img.url)} alt={img.shot_type ?? ""} className="aspect-[3/4] w-full object-cover transition duration-500 group-hover:scale-105" />
+                <SkeletonImage src={assetUrl(img.url)} alt={img.shot_type ?? ""} className="aspect-[3/4] w-full" imgClassName="transition duration-500 group-hover:scale-105" />
 
                 {/* overlay */}
                 <div className="absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-ink/60 via-transparent to-ink/10 opacity-0 transition group-hover:opacity-100">

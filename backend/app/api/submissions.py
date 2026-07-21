@@ -33,6 +33,7 @@ from app.schemas.catalog import (
     SubmissionOut,
 )
 from app.services.image_gen import aspect_for, build_prompt, get_image_service
+from app.services.image_tiers import public_tiers, tier_for
 from app.services.shopify import ShopifyError, ShopifyPublisher, creds_for_seller
 from app.services.storage import get_storage
 from app.services.tokens import tokens_used_for_seller
@@ -42,6 +43,17 @@ settings = get_settings()
 logger = logging.getLogger("vastra.api")
 router = APIRouter(prefix="/submissions", tags=["submissions"])
 storage = get_storage()
+
+# Intake guardrails
+MAX_UPLOAD_IMAGES = 8
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # 15 MB per image
+MAX_PROMPT_CHARS = 1200
+
+
+@router.get("/image-models")
+def image_models() -> dict:
+    """Image-generation tiers a seller can choose, with per-image token cost."""
+    return {"models": public_tiers()}
 
 
 def _image_url(image_id: str) -> str:
@@ -74,6 +86,13 @@ def create_submission(
     if not images:
         raise HTTPException(status_code=400, detail="At least one image is required")
 
+    # --- Guardrails: bound the request so a single upload can't blow up cost or storage ---
+    if len(images) > MAX_UPLOAD_IMAGES:
+        raise HTTPException(status_code=400, detail=f"Too many images (max {MAX_UPLOAD_IMAGES}).")
+    for up in images:
+        if up.content_type and not up.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail=f"'{up.filename}' is not an image.")
+
     # Token gate — block if the seller's balance is exhausted.
     used = tokens_used_for_seller(db, user.id)
     if used >= user.token_limit:
@@ -86,6 +105,10 @@ def create_submission(
         cust = json.loads(customization) if customization else {}
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="customization must be valid JSON")
+
+    # Cap free-text prompt length (defensive against abuse / runaway prompts).
+    if isinstance(cust.get("custom_prompt"), str) and len(cust["custom_prompt"]) > MAX_PROMPT_CHARS:
+        cust["custom_prompt"] = cust["custom_prompt"][:MAX_PROMPT_CHARS]
 
     submission = Submission(
         seller_id=user.id,
@@ -104,6 +127,11 @@ def create_submission(
 
     for idx, upload in enumerate(images):
         data = upload.file.read()
+        if len(data) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{upload.filename}' is too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)}MB).",
+            )
         ext = (upload.filename or "img").split(".")[-1][:5]
         key = f"submissions/{submission.id}/raw_{idx}.{ext}"
         storage.save(key, data, upload.content_type or "image/jpeg")
@@ -236,15 +264,17 @@ def regenerate_image(
     ).strip()
 
     service = get_image_service()
+    sub_cust = sub.customization or {}
+    tier = tier_for(payload.get("image_quality") or sub_cust.get("image_quality"))
     raws = [i for i in sub.images if i.kind == ImageKind.raw.value]
     aspect = aspect_for(shot)
     if raws:
         base = _normalize_png(storage.load(raws[0].storage_key))
         prompt = build_prompt(descriptor, shot, custom, has_reference=True)
-        png = service.edit(base, prompt, aspect=aspect)
+        png = service.edit(base, prompt, aspect=aspect, quality=tier["quality"])
     else:
         prompt = build_prompt(descriptor, shot, custom, has_reference=False)
-        png = service.generate(prompt, aspect=aspect)
+        png = service.generate(prompt, aspect=aspect, quality=tier["quality"])
 
     key = f"submissions/{submission_id}/gen_{shot}_{uuid.uuid4().hex[:6]}.png"
     storage.save(key, png, "image/png")

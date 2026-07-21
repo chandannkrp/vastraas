@@ -1,0 +1,48 @@
+# Local/prod-like orchestration for vastraas.ai.
+#   docker compose up --build
+# Put your secrets in a .env file at the repo root (see .env.example).
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      context: ./backend
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      AI_SERVICE_URL: http://ai-service:8100
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  ai-service:
+    build:
+      # Repo root as context so the editable `backend` package is available.
+      context: .
+      dockerfile: ai-service/Dockerfile
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      PORT: 8100
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8000}
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

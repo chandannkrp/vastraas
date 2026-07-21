@@ -116,8 +116,14 @@ def shopify_collections(
     creds = creds_for_seller(db, user.id)
     if not creds.configured:
         return {"collections": []}
-    try:
-        cols = ShopifyClient(creds).list_collections()
-        return {"collections": [{"id": c["id"], "title": c["title"]} for c in cols]}
-    except Exception:  # noqa: BLE001
-        return {"collections": []}
+    from app.services.cache import cached
+
+    def _fetch() -> dict:
+        try:
+            cols = ShopifyClient(creds).list_collections()
+            return {"collections": [{"id": c["id"], "title": c["title"]} for c in cols]}
+        except Exception:  # noqa: BLE001
+            return {"collections": []}
+
+    # Collections rarely change; cache 5 min per store to avoid the slow round-trip.
+    return cached(f"shopify:collections:{creds.store_domain}", 300, _fetch)

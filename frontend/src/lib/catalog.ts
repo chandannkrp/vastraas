@@ -93,6 +93,20 @@ export interface Customization {
   texture?: string;
   pattern?: string;
   custom_prompt?: string;
+  image_quality?: string;
+}
+
+export interface ImageModel {
+  key: string;
+  label: string;
+  tokens_per_image: number;
+  blurb: string;
+  recommended?: boolean;
+}
+
+export async function getImageModels(): Promise<ImageModel[]> {
+  const { data } = await api.get("/submissions/image-models");
+  return data.models ?? [];
 }
 
 // --- API calls ---------------------------------------------------------
@@ -236,6 +250,54 @@ export async function getBusinessDetail(id: string): Promise<BusinessDetail> {
 export async function getGrowth(): Promise<GrowthMetrics> {
   const { data } = await api.get("/admin/growth");
   return data;
+}
+
+// --- Admin: system config, usage, files ---
+
+export interface AdminConfig {
+  effective: Record<string, string | null>;
+  options: Record<string, string[]>;
+}
+
+export async function getAdminConfig(): Promise<AdminConfig> {
+  const { data } = await api.get("/admin/config");
+  return data;
+}
+
+export async function updateAdminConfig(patch: Record<string, string>): Promise<{ effective: Record<string, string | null> }> {
+  const { data } = await api.put("/admin/config", patch);
+  return data;
+}
+
+export interface ModelUsage {
+  providers: Record<string, string | null>;
+  runs: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  images_generated: number;
+  image_tiers: ImageModel[];
+}
+
+export async function getModelUsage(): Promise<ModelUsage> {
+  const { data } = await api.get("/admin/usage");
+  return data;
+}
+
+export interface StoredFile {
+  key: string;
+  size: number;
+  last_modified: number;
+  url?: string | null;
+}
+
+export async function listAdminFiles(prefix = "", limit = 60): Promise<{ files: StoredFile[]; backend: string }> {
+  const { data } = await api.get("/admin/files", { params: { prefix, limit } });
+  return data;
+}
+
+export async function deleteAdminFile(key: string): Promise<void> {
+  await api.delete("/admin/files", { data: { key } });
 }
 
 // --- Billing / packs ---------------------------------------------------

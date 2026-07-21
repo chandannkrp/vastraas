@@ -30,10 +30,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
+# CORS origins are configurable: CORS_ORIGINS (comma-separated) takes precedence,
+# else the single FRONTEND_ORIGIN. "*" allows any origin (disables credentials,
+# which browsers forbid alongside a wildcard).
+_origins = settings.cors_origin_list
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_origin],
-    allow_credentials=True,
+    allow_origins=_origins,
+    allow_origin_regex=settings.cors_origin_regex or None,
+    allow_credentials="*" not in _origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

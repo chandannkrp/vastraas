@@ -24,6 +24,7 @@ import {
 import { usePipelineDock } from "../lib/pipelineDock";
 import { BrandLoader, BrandLoaderPanel } from "./BrandLoader";
 import { ImageFeed } from "./ImageFeed";
+import { SkeletonImage } from "./SkeletonImage";
 import { StatusBadge } from "./StatusBadge";
 import { StyleSuggestions } from "./StyleSuggestions";
 
@@ -347,7 +348,7 @@ function PublishTab({
             return (
               <button key={img.id} onClick={() => toggleImage(img.id)}
                 className={`relative overflow-hidden rounded-xl border-2 transition ${on ? "border-indigo-600" : "border-transparent opacity-60"}`}>
-                <img src={assetUrl(img.url)} alt="" className="aspect-square w-full object-cover" />
+                <SkeletonImage src={assetUrl(img.url)} className="aspect-square w-full" />
                 {on && <span className="absolute right-1 top-1 rounded-full bg-indigo-600 p-0.5 text-white"><Check size={11} strokeWidth={3} /></span>}
               </button>
             );

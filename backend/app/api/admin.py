@@ -79,15 +79,21 @@ def business_detail(
 
 
 def _daily_counts(db: Session, model_date_col, days: int = 14) -> list[dict]:
-    since = datetime.now(timezone.utc) - timedelta(days=days - 1)
-    day = func.date(model_date_col)
-    rows = db.execute(
-        select(day.label("d"), func.count().label("c")).where(model_date_col >= since).group_by(day)
-    ).all()
-    by_day = {str(r.d): int(r.c) for r in rows}
+    """Per-day row counts, bucketed in Python so the result never depends on the
+    DB's ``date()`` semantics or tz serialisation (the old ``func.date`` +
+    ``.label('d')`` approach silently returned empties — the charts were blank)."""
     base = datetime.now(timezone.utc).date()
+    since = datetime.now(timezone.utc) - timedelta(days=days - 1)
+    by_day: dict[str, int] = {}
+    for (created_at,) in db.execute(select(model_date_col).where(model_date_col >= since)).all():
+        if created_at is None:
+            continue
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        key = created_at.astimezone(timezone.utc).date().isoformat()
+        by_day[key] = by_day.get(key, 0) + 1
     return [
-        {"date": str(base - timedelta(days=i)), "count": by_day.get(str(base - timedelta(days=i)), 0)}
+        {"date": (base - timedelta(days=i)).isoformat(), "count": by_day.get((base - timedelta(days=i)).isoformat(), 0)}
         for i in range(days - 1, -1, -1)
     ]
 
@@ -131,3 +137,85 @@ def growth(_: Seller = Depends(require_admin), db: Session = Depends(get_db)) ->
         signups_daily=_daily_counts(db, Seller.created_at),
         submissions_daily=_daily_counts(db, Submission.created_at),
     )
+
+
+# --------------------------------------------------------------------------- #
+# System: provider config, model usage, and stored files
+# --------------------------------------------------------------------------- #
+@router.get("/config")
+def get_config(_: Seller = Depends(require_admin)) -> dict:
+    from app.services import runtime_config
+
+    return {
+        "effective": runtime_config.effective(),
+        "options": {
+            "llm_provider": ["openai", "bedrock"],
+            "image_provider": ["openai", "gemini"],
+        },
+    }
+
+
+@router.put("/config")
+def update_config(payload: dict, _: Seller = Depends(require_admin)) -> dict:
+    from app.services import runtime_config
+
+    allowed = set(runtime_config.OVERRIDABLE)
+    for key, value in payload.items():
+        if key in allowed and value is not None:
+            runtime_config.set(key, str(value))
+    return {"effective": runtime_config.effective()}
+
+
+@router.get("/usage")
+def model_usage(_: Seller = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    from app.services import runtime_config
+    from app.services.image_tiers import public_tiers
+
+    total_runs = db.scalar(select(func.count(PipelineRun.id))) or 0
+    total_in = db.scalar(select(func.coalesce(func.sum(PipelineRun.total_input_tokens), 0))) or 0
+    total_out = db.scalar(select(func.coalesce(func.sum(PipelineRun.total_output_tokens), 0))) or 0
+    from app.models.tables import Image, ImageKind
+
+    images_generated = (
+        db.scalar(select(func.count(Image.id)).where(Image.kind == ImageKind.enhanced.value)) or 0
+    )
+    return {
+        "providers": runtime_config.effective(),
+        "runs": int(total_runs),
+        "input_tokens": int(total_in),
+        "output_tokens": int(total_out),
+        "total_tokens": int(total_in) + int(total_out),
+        "images_generated": int(images_generated),
+        "image_tiers": public_tiers(),
+    }
+
+
+@router.get("/files")
+def list_files(
+    prefix: str = "", limit: int = 100, _: Seller = Depends(require_admin)
+) -> dict:
+    from app.services.storage import get_storage
+
+    storage = get_storage()
+    if not hasattr(storage, "list_objects"):
+        return {"files": [], "backend": "unknown"}
+    files = storage.list_objects(prefix=prefix, limit=limit)
+    # Attach a viewable URL: presigned for S3, the images API for local.
+    for f in files:
+        if hasattr(storage, "presigned_url"):
+            try:
+                f["url"] = storage.presigned_url(f["key"], 900)
+            except Exception:  # noqa: BLE001
+                f["url"] = None
+    return {"files": files, "backend": "s3" if hasattr(storage, "presigned_url") else "local"}
+
+
+@router.delete("/files")
+def delete_file(payload: dict, _: Seller = Depends(require_admin)) -> dict:
+    from app.services.storage import get_storage
+
+    key = (payload.get("key") or "").strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="key is required")
+    get_storage().delete(key)
+    return {"deleted": key}

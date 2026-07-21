@@ -35,6 +35,22 @@ class LocalStorage:
         if path.exists():
             path.unlink()
 
+    def list_objects(self, prefix: str = "", limit: int = 200) -> list[dict]:
+        base = self.root.resolve()
+        out: list[dict] = []
+        for p in base.rglob("*"):
+            if not p.is_file():
+                continue
+            key = p.relative_to(base).as_posix()
+            if prefix and not key.startswith(prefix):
+                continue
+            st = p.stat()
+            out.append({"key": key, "size": st.st_size, "last_modified": st.st_mtime})
+            if len(out) >= limit:
+                break
+        out.sort(key=lambda o: o["last_modified"], reverse=True)
+        return out
+
 
 class S3Storage:
     """AWS S3 (or any S3-compatible store via a custom endpoint, e.g. R2)."""
@@ -78,6 +94,15 @@ class S3Storage:
         return self.client.generate_presigned_url(
             "get_object", Params={"Bucket": self.bucket, "Key": key}, ExpiresIn=expires
         )
+
+    def list_objects(self, prefix: str = "", limit: int = 200) -> list[dict]:
+        resp = self.client.list_objects_v2(Bucket=self.bucket, Prefix=prefix, MaxKeys=limit)
+        out = [
+            {"key": o["Key"], "size": o["Size"], "last_modified": o["LastModified"].timestamp()}
+            for o in resp.get("Contents", [])
+        ]
+        out.sort(key=lambda o: o["last_modified"], reverse=True)
+        return out
 
 
 def get_storage():
