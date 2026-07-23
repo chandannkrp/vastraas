@@ -52,6 +52,8 @@ class LocalStorage:
         return out
 
 
+
+
 class S3Storage:
     """AWS S3 (or any S3-compatible store via a custom endpoint, e.g. R2)."""
 

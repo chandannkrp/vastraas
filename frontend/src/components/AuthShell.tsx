@@ -18,7 +18,7 @@ export function AuthShell({
       {/* Brand panel */}
       <div className="weave-bg relative hidden flex-col justify-between bg-indigo-900 p-12 lg:flex">
         <div className="relative">
-          <Logo to="/" dark />
+          <Logo to="/" />
         </div>
         <div className="relative max-w-md">
           <Quote className="mb-4 text-saffron-400" size={36} />
@@ -44,7 +44,7 @@ export function AuthShell({
           className="w-full max-w-md"
         >
           <div className="mb-8 lg:hidden">
-            <Logo to="/" />
+            <Logo to="/" dark />
           </div>
           <h1 className="font-display text-3xl font-semibold text-ink">{title}</h1>
           <p className="mt-2 text-ink-soft">{subtitle}</p>

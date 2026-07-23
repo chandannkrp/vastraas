@@ -24,7 +24,7 @@ export function Navbar() {
       className="sticky top-0 z-40 border-b border-black/5 bg-cream/80 backdrop-blur-md"
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Logo />
+        <Logo dark />
         <nav className="flex items-center gap-2 sm:gap-3">
           {user ? (
             <>
